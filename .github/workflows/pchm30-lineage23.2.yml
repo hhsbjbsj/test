@@ -1,0 +1,95 @@
+name: PCHM30 LineageOS 23.2 Bring-up Probe
+
+on:
+  push:
+    branches:
+      - pchm30-lineage23.2-bringup
+    paths:
+      - '.github/workflows/pchm30-lineage23.2.yml'
+      - 'device/oppo/PCHM30/**'
+      - 'scripts/pchm30-build.sh'
+  workflow_dispatch:
+
+concurrency:
+  group: pchm30-lineage23-2-bringup
+  cancel-in-progress: false
+
+jobs:
+  compile-probe:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 350
+    permissions:
+      contents: read
+
+    steps:
+      - name: Maximise Android build space
+        uses: easimon/maximize-build-space@master
+        with:
+          root-reserve-mb: 6144
+          swap-size-mb: 4096
+          build-mount-path: '/work'
+          remove-dotnet: 'true'
+          remove-android: 'true'
+          remove-haskell: 'true'
+          remove-codeql: 'true'
+          remove-docker-images: 'true'
+
+      - name: Take ownership of build volume
+        run: sudo chown -R "$(id -u):$(id -g)" /work
+
+      - name: Checkout PCHM30 bring-up tree
+        uses: actions/checkout@v4
+
+      - name: Install host dependencies and repo
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            bc bison build-essential ccache curl flex g++-multilib gcc-multilib \
+            git git-lfs gnupg gperf imagemagick lib32ncurses-dev lib32readline-dev \
+            lib32z1-dev libelf-dev liblz4-tool libncurses5 libncurses5-dev \
+            libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop pngcrush \
+            rsync schedtool squashfs-tools xsltproc zip zlib1g-dev
+          git lfs install
+          mkdir -p "$HOME/bin"
+          curl -fsSL https://storage.googleapis.com/git-repo-downloads/repo > "$HOME/bin/repo"
+          chmod +x "$HOME/bin/repo"
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+
+      - name: Show build volume
+        run: df -h / /work
+
+      - name: Sync LineageOS and compile PCHM30 probes
+        env:
+          WORKDIR: /work/lineage
+          LINEAGE_BRANCH: lineage-23.2
+          USE_CCACHE: '1'
+          CCACHE_DIR: /work/ccache
+          CCACHE_EXEC: /usr/bin/ccache
+        run: bash scripts/pchm30-build.sh
+
+      - name: Disk report after build
+        if: always()
+        run: df -h / /work
+
+      - name: Upload compile-probe images
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PCHM30-LINEAGE23.2-COMPILE-PROBE-${{ github.run_number }}
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Safety summary
+        if: success()
+        run: |
+          {
+            echo '### PCHM30 LineageOS 23.2 compile probe passed'
+            echo
+            echo '**These are not flash-test-ready ROM images yet.**'
+            echo 'The next gate is exact stock partition geometry + PCHM30 proprietary vendor/HAL integration + VINTF/SELinux.'
+            echo
+            echo '```text'
+            cat artifacts/SHA256SUMS.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
