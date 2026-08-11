@@ -1,0 +1,8 @@
+# PCHM30 bring-up fstab - compile-probe baseline only.
+# Encryption flags are intentionally omitted until the stock Android 11 fstab is
+# imported verbatim; do not use this file as a final data-mount configuration.
+/dev/block/bootdevice/by-name/system    /system    ext4    ro,barrier=1    wait,first_stage_mount
+/dev/block/bootdevice/by-name/vendor    /vendor    ext4    ro,barrier=1    wait,first_stage_mount
+/dev/block/bootdevice/by-name/cache     /cache     ext4    noatime,nosuid,nodev,barrier=1    wait,check,formattable
+/dev/block/bootdevice/by-name/metadata  /metadata  ext4    noatime,nosuid,nodev,barrier=1    wait,check,formattable
+/dev/block/bootdevice/by-name/userdata  /data      ext4    noatime,nosuid,nodev,discard,barrier=1    wait,check,formattable,quota
