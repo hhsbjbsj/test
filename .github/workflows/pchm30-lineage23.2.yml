@@ -22,11 +22,38 @@ jobs:
       contents: read
 
     steps:
+      - name: Free hosted-runner space before LVM
+        run: |
+          echo 'Largest preinstalled directories before cleanup:'
+          sudo du -xhd1 /opt /usr/local /usr/share 2>/dev/null | sort -h | tail -40 || true
+
+          # Android/LineageOS ships its own prebuilts for JDK/clang/rust/etc.
+          # These hosted-runner SDK/tool caches are not needed by this build and
+          # must be removed before maximize-build-space sizes the LVM volume.
+          sudo rm -rf \
+            /opt/hostedtoolcache \
+            /usr/local/.ghcup \
+            /usr/local/lib/android \
+            /usr/local/share/boost \
+            /usr/local/share/chromium \
+            /usr/local/share/powershell \
+            /usr/local/share/vcpkg \
+            /usr/share/dotnet \
+            /usr/share/swift \
+            /opt/ghc \
+            /opt/google \
+            /opt/microsoft || true
+
+          sudo apt-get clean || true
+          sudo rm -rf /var/lib/apt/lists/* || true
+          echo 'Disk after pre-clean:'
+          df -h / /mnt
+
       - name: Maximise Android build space
         uses: easimon/maximize-build-space@master
         with:
-          root-reserve-mb: 6144
-          swap-size-mb: 4096
+          root-reserve-mb: 2048
+          swap-size-mb: 2048
           build-mount-path: '/work'
           remove-dotnet: 'true'
           remove-android: 'true'
