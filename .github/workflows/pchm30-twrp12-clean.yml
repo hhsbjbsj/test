@@ -1,0 +1,65 @@
+name: PCHM30 TWRP 12.1 Clean
+
+on:
+  push:
+    branches:
+      - pchm30-twrp12-1-clean
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 360
+
+    steps:
+      - name: Checkout experiment branch
+        uses: actions/checkout@v4
+
+      - name: Install Android recovery build dependencies
+        shell: bash
+        run: |
+          set -eux
+          df -h
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            bc bison build-essential ccache curl flex g++-multilib gcc-multilib \
+            git git-lfs gnupg gperf imagemagick lib32ncurses-dev lib32readline-dev \
+            lib32z1-dev libelf-dev liblz4-tool libssl-dev libxml2 libxml2-utils \
+            lzop pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev \
+            openjdk-11-jdk-headless python3
+          mkdir -p "$HOME/bin"
+          curl -fsSL https://storage.googleapis.com/git-repo-downloads/repo -o "$HOME/bin/repo"
+          chmod +x "$HOME/bin/repo"
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+          git config --global user.name "pchm30-ci"
+          git config --global user.email "pchm30-ci@users.noreply.github.com"
+          git config --global advice.detachedHead false
+          df -h
+
+      - name: Build clean native TeamWin TWRP
+        shell: bash
+        env:
+          CCACHE_DIR: ${{ github.workspace }}/.ccache
+        run: |
+          chmod +x scripts/build_pchm30_twrp_clean.sh
+          bash scripts/build_pchm30_twrp_clean.sh
+
+      - name: Runner disk report
+        if: always()
+        shell: bash
+        run: |
+          df -h || true
+          du -sh _twrp_clean 2>/dev/null || true
+          du -sh artifacts 2>/dev/null || true
+
+      - name: Upload recovery and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PCHM30-TWRP-12.1-CLEAN-${{ github.run_number }}
+          path: artifacts/**
+          if-no-files-found: warn
+          compression-level: 6
